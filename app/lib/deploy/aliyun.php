@@ -66,11 +66,11 @@ class aliyun implements DeployInterface
                 $this->deploy_alb($cert_id, $config);
             } elseif ($config['product'] == 'nlb') {
                 $this->deploy_nlb($cert_id, $config);
-            } elseif($config['product'] == 'esa_saas'){
+            } elseif ($config['product'] == 'esa_saas') {
                 $this->deploy_esa_saas($cert_id, $config);
             } elseif ($config['product'] == 'ga') {
                 $this->deploy_ga($cert_id, $config);
-            }elseif ($config['product'] == 'upload') {
+            } elseif ($config['product'] == 'upload') {
             } else {
                 throw new Exception('未知的产品类型');
             }
@@ -196,7 +196,7 @@ class aliyun implements DeployInterface
         $this->log('成功查询到' . $data['TotalCount'] . '个ESA站点');
         $site_id = $data['Sites'][0]['SiteId'];
         // 查询对应的saas域名
-        $param =[
+        $param = [
             'Action' => 'ListCustomHostnames',
             'SiteName' => $saas_sitename,
             'SiteId' => $site_id,
@@ -212,18 +212,18 @@ class aliyun implements DeployInterface
 
         $param = [
             'Action' => 'UpdateCustomHostname',
-            'HostnameId'=> $saas_hostname_id,
+            'HostnameId' => $saas_hostname_id,
             'SslFlag' => 'on',
             'CertType' => 'cas',
             'CasId' => $cas_id,
             'CasRegion' => $config['region'],
         ];
         $this->log('ESA SAAS站点部署参数 ' . json_encode($param));
-        try{
+        try {
             $saas_deploy_result = $client->request($param);
             $this->log('ESA SAAS站点部署结果 ' . json_encode($saas_deploy_result));
-        }catch(Exception $e){
-             throw new Exception('部署失败：' . $e->getMessage());
+        } catch (Exception $e) {
+            throw new Exception('部署失败：' . $e->getMessage());
         }
         $this->log('ESA SAAS站点 ' . $saas_sitename . ' 证书添加成功！');
     }

@@ -252,3 +252,13 @@ CREATE TABLE `dnsmgr_sctask` (
   PRIMARY KEY (`id`),
   KEY `did` (`did`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `dnsmgr_domain_alias`;
+CREATE TABLE `dnsmgr_domain_alias` (
+  `id` int(11) unsigned NOT NULL auto_increment,
+  `did` int(11) unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `did` (`did`),
+  KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
