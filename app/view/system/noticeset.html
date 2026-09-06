@@ -94,6 +94,10 @@
 	  <div class="col-sm-9"><input type="text" name="tgbot_chatid" value="{:config_get('tgbot_chatid')}" class="form-control"/></div>
 	</div>
 	<div class="form-group">
+	  <label class="col-sm-3 control-label">Topic Id</label>
+	  <div class="col-sm-9"><input type="text" name="tgbot_topicid" value="{:config_get('tgbot_topicid')}" class="form-control" placeholder="非必填"/></div>
+	</div>
+	<div class="form-group">
 	  <label class="col-sm-3 control-label">使用代理服务器</label>
 	  <div class="col-sm-9"><select class="form-control" name="tgbot_proxy" default="{:config_get('tgbot_proxy')}"><option value="0">否</option><option value="1">是</option><option value="2">自定义反代URL</option></select></div>
 	</div>
@@ -110,7 +114,7 @@
   </form>
 </div>
 <div class="panel-footer">
-与<a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a>对话，使用/newbot命令创建一个新的机器人，根据提示输入机器人的名称和用户名，可得到Token，或使用/mybots命令查看已创建的机器人；与<a href="https://t.me/getmyid_bot" target="_blank" rel="noopener noreferrer">@getmyid_bot</a>对话，可得到Chat Id<br/>
+与<a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a>对话，使用/newbot命令创建一个新的机器人，根据提示输入机器人的名称和用户名，可得到Token，或使用/mybots命令查看已创建的机器人；与<a href="https://t.me/getmyid_bot" target="_blank" rel="noopener noreferrer">@getmyid_bot</a>对话，可得到Chat Id。超级群话题可填写 Topic Id，不填则发送到群默认位置<br/>
 </div>
 </div>
 <div class="panel panel-info">
@@ -137,6 +141,44 @@
 仅支持填写企业微信、钉钉、飞书群机器人的Webhook地址<br/>
 认证方式可以选自定义关键词“DNS”或IP白名单。<br/>
 @用户不支持企业微信，飞书用户手机号需要填写<a href="https://open.feishu.cn/document/home/user-identity-introduction/open-id" target="_blank" rel="noreferrer">用户ID</a>。
+</div>
+</div>
+<div class="panel panel-info">
+<div class="panel-heading"><h3 class="panel-title">自定义Webhook</h3></div>
+<div class="panel-body">
+  <form onsubmit="return saveSetting(this)" method="post" class="form-horizontal" role="form">
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">Webhook地址</label>
+	  <div class="col-sm-9"><input type="text" name="custom_webhook_url" value="{:config_get('custom_webhook_url')}" class="form-control" placeholder="https://example.com/webhook"/></div>
+	</div>
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">请求方式</label>
+	  <div class="col-sm-9"><select class="form-control" name="custom_webhook_method" default="{:config_get('custom_webhook_method', 'POST')}"><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option></select></div>
+	</div>
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">Content-Type</label>
+	  <div class="col-sm-9"><select class="form-control" name="custom_webhook_content_type" default="{:config_get('custom_webhook_content_type', 'application/json')}"><option value="application/json">application/json</option><option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option></select></div>
+	</div>
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">自定义Headers</label>
+	  <div class="col-sm-9"><textarea name="custom_webhook_headers" class="form-control" rows="3" placeholder='每行一个，格式：HeaderName: HeaderValue'>{:config_get('custom_webhook_headers')}</textarea></div>
+	</div>
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">请求Body</label>
+	  <div class="col-sm-9"><textarea name="custom_webhook_body" class="form-control" rows="4">{php}echo htmlspecialchars(config_get('custom_webhook_body') ?: '{"title":"{title}","content":"{content}"}');{/php}</textarea>
+	  <font color="green">支持变量：&#123;title&#125;、&#123;content&#125;，如果是GET方式，将作为query参数拼接到url上</font></div>
+	</div>
+	<div class="form-group">
+	  <label class="col-sm-3 control-label">消息内容格式</label>
+	  <div class="col-sm-9"><select class="form-control" name="custom_webhook_content_format" default="{:config_get('custom_webhook_content_format', 'html')}"><option value="html">HTML</option><option value="markdown">Markdown</option><option value="text">纯文本</option></select></div>
+	</div>
+	<div class="form-group">
+	  <div class="col-sm-offset-3 col-sm-9">
+		<input type="submit" name="submit" value="保存" class="btn btn-primary btn-block"/>
+		<a href="javascript:customwebhooktest()" class="btn btn-default btn-block">发送测试消息</a>
+	</div>
+	</div>
+  </form>
 </div>
 </div>
 </div>
@@ -239,6 +281,26 @@ function webhooktest(){
 	$.ajax({
 		type : 'GET',
 		url : '/system/webhooktest',
+		dataType : 'json',
+		success : function(data) {
+			layer.close(ii);
+			if(data.code == 0){
+				layer.alert(data.msg, {icon: 1});
+			}else{
+				layer.alert(data.msg, {icon: 2})
+			}
+		},
+		error:function(data){
+            layer.close(ii);
+			layer.msg('服务器错误');
+		}
+	});
+}
+function customwebhooktest(){
+	var ii = layer.load(2, {shade:[0.1,'#fff']});
+	$.ajax({
+		type : 'GET',
+		url : '/system/customwebhooktest',
 		dataType : 'json',
 		success : function(data) {
 			layer.close(ii);

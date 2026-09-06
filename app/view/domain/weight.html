@@ -15,7 +15,6 @@
 			</div>
 			<div class="modal-body">
 				<form class="form-horizontal" id="form-store" onsubmit="return save(this)">
-					<input type="hidden" name="id"/>
 					<input type="hidden" name="subdomain"/>
 					<input type="hidden" name="type"/>
 					<div class="form-group">
@@ -76,7 +75,7 @@
 <script src="/static/js/layer/layer.js"></script>
 <script src="/static/js/bootstrap-table-1.21.4.min.js"></script>
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
-<script src="/static/js/custom.js"></script>
+<script src="/static/js/custom.js?v=1006"></script>
 <script>
 var dnsconfig = {$dnsconfig|json_encode|raw};
 var recordLine = {$recordLine|json_encode|raw};
@@ -85,9 +84,9 @@ var weightList = [];
 var lineList = [];
 $(document).ready(function(){
 	updateToolbar();
-	const defaultPageSize = 15;
+	const pageSizeKey = 'weight_pagesize';
 	const pageNumber = typeof window.$_GET['pageNumber'] != 'undefined' ? parseInt(window.$_GET['pageNumber']) : 1;
-	const pageSize = typeof window.$_GET['pageSize'] != 'undefined' ? parseInt(window.$_GET['pageSize']) : defaultPageSize;
+	const pageSize = getStoredPageSize(pageSizeKey);
 
 	$("#listTable").bootstrapTable({
 		url: '/record/weight/data/{$domainId}',
@@ -138,6 +137,9 @@ $(document).ready(function(){
 				}
 			},
 		],
+		onPageChange: function(number, size){
+			setStoredPageSize(pageSizeKey, size);
+		},
 	})
 })
 function editframe(id){
@@ -153,7 +155,6 @@ function editframe(id){
 			if(data.code == 0){
 				$("#modal-store").modal('show');
 				$("#modal-title").html("设置权重 - "+row.SubDomain);
-				$("#form-store input[name=id]").val(id);
 				$("#form-store input[name=subdomain]").val(row.SubDomain);
 				$("#form-store input[name=type]").val(row.Type);
 				if(row.Type == 'CNAME') $("#weight-switch").prop("disabled", true);

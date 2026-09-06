@@ -61,6 +61,9 @@ class MsgNotice
             $content = str_replace(['<br/>', '<b>', '</b>'], ["\n", '**', '**'], $mail_content);
             self::send_webhook($mail_title, $content);
         }
+        if (config_get('notice_custom_webhook') == 1) {
+            self::send_custom_webhook($mail_title, $mail_content);
+        }
     }
 
     public static function cert_order_send($id, $result)
@@ -78,21 +81,23 @@ class MsgNotice
             $mail_content = '尊敬的用户，您好：您有一张SSL证书将在'.config_get('cert_renewdays', 7).'天后到期，该证书为手动续期证书，请及时续期！<br/><b>证书域名：</b> '.implode('、', $domainList).'<br/><b>签发时间：</b> '.$row['issuetime'].'<br/><b>到期时间：</b> '.$row['expiretime'].'<br/><b>颁发机构：</b> '.$row['issuer'];
         } else {
             $type = Db::name('cert_account')->where('id', $row['aid'])->value('type');
+            $typename = (!empty($type) && isset(CertHelper::$cert_config[$type])) ? CertHelper::$cert_config[$type]['name'] : ($type ?: '未知');
             if ($result) {
                 if (count($domainList) > 1) {
                     $mail_title = $domainList[0] . '等' . count($domainList) . '个域名SSL证书签发成功通知';
                 } else {
                     $mail_title = $domainList[0] . '域名SSL证书签发成功通知';
                 }
-                $mail_content = '尊敬的用户，您好：您的SSL证书已签发成功！<br/><b>证书账户：</b> '.CertHelper::$cert_config[$type]['name'].'('.$row['aid'].')<br/><b>证书域名：</b> '.implode('、', $domainList).'<br/><b>签发时间：</b> '.$row['issuetime'].'<br/><b>到期时间：</b> '.$row['expiretime'].'<br/><b>颁发机构：</b> '.$row['issuer'];
+                $mail_content = '尊敬的用户，您好：您的SSL证书已签发成功！<br/><b>证书账户：</b> '.$typename.'('.$row['aid'].')<br/><b>证书域名：</b> '.implode('、', $domainList).'<br/><b>签发时间：</b> '.$row['issuetime'].'<br/><b>到期时间：</b> '.$row['expiretime'].'<br/><b>颁发机构：</b> '.$row['issuer'];
             } else {
                 $status_arr = [0 => '失败', -1 => '购买证书失败', -2 => '创建订单失败', -3 => '添加DNS失败', -4 => '验证DNS失败', -5 => '验证订单失败', -6 => '订单验证未通过', -7 => '签发证书失败'];
+                $status_name = $status_arr[$row['status']] ?? '处理失败';
                 if(count($domainList) > 1){
-                    $mail_title = $domainList[0].'等'.count($domainList).'个域名SSL证书'.$status_arr[$row['status']].'通知';
+                    $mail_title = $domainList[0].'等'.count($domainList).'个域名SSL证书'.$status_name.'通知';
                 }else{
-                    $mail_title = $domainList[0].'域名SSL证书'.$status_arr[$row['status']].'通知';
+                    $mail_title = $domainList[0].'域名SSL证书'.$status_name.'通知';
                 }
-                $mail_content = '尊敬的用户，您好：您的SSL证书'.$status_arr[$row['status']].'！<br/><b>证书账户：</b> '.CertHelper::$cert_config[$type]['name'].'('.$row['aid'].')<br/><b>证书域名：</b> '.implode('、', $domainList).'<br/><b>失败时间：</b> '.date('Y-m-d H:i:s').'<br/><b>失败原因：</b> <font color="warning">'.$row['error'].'</font>';
+                $mail_content = '尊敬的用户，您好：您的SSL证书'.$status_name.'！<br/><b>证书账户：</b> '.$typename.'('.$row['aid'].')<br/><b>证书域名：</b> '.implode('、', $domainList).'<br/><b>失败时间：</b> '.date('Y-m-d H:i:s').'<br/><b>失败原因：</b> <font color="warning">'.$row['error'].'</font>';
             }
         }
         $mail_content .= '<br/><font color="grey">'.self::$sitename.'</font><br/><font color="grey">'.date('Y-m-d H:i:s').'</font>';
@@ -106,8 +111,9 @@ class MsgNotice
         $row = Db::name('cert_deploy')->field('id,aid,oid,remark,status,error')->where('id', $id)->find();
         if (!$row) return;
         $account = Db::name('cert_account')->field('id,type,name,remark')->where('id', $row['aid'])->find();
+        if (!$account) return;
         $domainList = Db::name('cert_domain')->where('oid', $row['oid'])->column('domain');
-        $typename = DeployHelper::$deploy_config[$account['type']]['name'];
+        $typename = (!empty($account['type']) && isset(DeployHelper::$deploy_config[$account['type']])) ? DeployHelper::$deploy_config[$account['type']]['name'] : ($account['type'] ?: '未知');
         $mail_title = $typename;
         if(!empty($row['remark'])) $mail_title .= '('.$row['remark'].')';
         $mail_title .= 'SSL证书部署'.($result?'成功':'失败').'通知';
@@ -141,6 +147,9 @@ class MsgNotice
             $content = str_replace(['*', '<br/>', '<b>', '</b>'], ['\*', "\n", '**', '**'], $mail_content);
             self::send_webhook($mail_title, $content);
         }
+        if (config_get('cert_notice_custom_webhook') == 1 || config_get('cert_notice_custom_webhook') == 2 && !$result) {
+            self::send_custom_webhook($mail_title, $mail_content);
+        }
     }
 
     public static function expire_notice_send($day, $list)
@@ -168,6 +177,9 @@ class MsgNotice
         if (config_get('expire_notice_webhook') == 1) {
             $content = str_replace(['*', '<br/>', '<b>', '</b>'], ['\*', "\n", '**', '**'], $mail_content);
             self::send_webhook($mail_title, $content);
+        }
+        if (config_get('expire_notice_custom_webhook') == 1) {
+            self::send_custom_webhook($mail_title, $mail_content);
         }
     }
 
@@ -223,6 +235,7 @@ class MsgNotice
         $url = 'https://wxpusher.zjiecode.com/api/send/message';
         $post = ['appToken' => $wechat_apptoken, 'content' => $content, 'summary' => $title, 'contentType' => 3, 'uids' => [$wechat_appuid]];
         $result = get_curl($url, json_encode($post), 0, 0, 0, 0, ['Content-Type' => 'application/json; charset=UTF-8']);
+        if (!$result) return '请求失败';
         $arr = json_decode($result, true);
         if (isset($arr['success']) && $arr['success'] == true) {
             return true;
@@ -245,7 +258,12 @@ class MsgNotice
         }
         $url = $tgbot_url.'/bot'.$tgbot_token.'/sendMessage';
         $post = ['chat_id' => $tgbot_chatid, 'text' => $content, 'parse_mode' => 'HTML'];
+        $tgbot_topicid = intval(config_get('tgbot_topicid'));
+        if ($tgbot_topicid > 0) {
+            $post['message_thread_id'] = $tgbot_topicid;
+        }
         $result = self::telegram_curl($url, http_build_query($post));
+        if (!$result) return '请求失败';
         $arr = json_decode($result, true);
         if (isset($arr['ok']) && $arr['ok'] == true) {
             return true;
@@ -348,11 +366,91 @@ class MsgNotice
             return '不支持的Webhook地址';
         }
         $result = get_curl($url, json_encode($post), 0, 0, 0, 0, ['Content-Type' => 'application/json; charset=UTF-8']);
+        if (!$result) return '请求失败';
         $arr = json_decode($result, true);
         if (isset($arr['errcode']) && $arr['errcode'] == 0 || isset($arr['code']) && $arr['code'] == 0) {
             return true;
         } else {
             return $arr['errmsg'] ?? (isset($arr['msg']) ? $arr['msg'] : '请求失败');
+        }
+    }
+
+    public static function send_custom_webhook($title, $content)
+    {
+        $url = config_get('custom_webhook_url');
+        if (!$url || !parse_url($url)) return false;
+
+        $method = strtoupper(config_get('custom_webhook_method') ?: 'POST');
+        $contentType = config_get('custom_webhook_content_type') ?: 'application/json';
+        $headersRaw = config_get('custom_webhook_headers');
+        $bodyTemplate = config_get('custom_webhook_body') ?: '{"title":"{title}","content":"{content}"}';
+        $contentFormat = config_get('custom_webhook_content_format') ?: 'text';
+
+        if ($contentFormat === 'markdown') {
+            $content = str_replace(['<br/>', '<b>', '</b>'], ["\n", '**', '**'], $content);
+            $content = strip_tags($content);
+        } elseif ($contentFormat === 'text') {
+            $content = str_replace('<br/>', "\n", $content);
+            $content = strip_tags($content);
+        }
+
+        $body = str_replace(['{title}', '{content}'], [$title, $content], $bodyTemplate);
+
+        $headers = [];
+        if (!empty($headersRaw)) {
+            $lines = explode("\n", $headersRaw);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                $pos = strpos($line, ':');
+                if ($pos !== false) {
+                    $key = trim(substr($line, 0, $pos));
+                    $val = trim(substr($line, $pos + 1));
+                    if ($key !== '') $headers[$key] = $val;
+                }
+            }
+        }
+
+        $options = [
+            'timeout' => 10,
+            'verify' => false,
+            'headers' => $headers,
+            'http_errors' => false,
+        ];
+
+        if ($method === 'GET') {
+            $params = [];
+            if ($contentType === 'application/json') {
+                $decoded = json_decode($body, true);
+                if (is_array($decoded)) {
+                    $params = $decoded;
+                }
+            } else {
+                parse_str($body, $params);
+            }
+            $connector = strpos($url, '?') !== false ? '&' : '?';
+            $url = $url . $connector . http_build_query($params);
+        } else {
+            $options['headers']['Content-Type'] = $contentType;
+            if ($contentType === 'application/json') {
+                json_decode($body);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $body = json_encode(['title' => $title, 'content' => $content]);
+                }
+            }
+            $options['body'] = $body;
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->request($method, $url, $options);
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return true;
+            }
+            return '请求失败，HTTP状态码：' . $statusCode;
+        } catch (\Exception $e) {
+            return '请求失败：' . $e->getMessage();
         }
     }
 
@@ -377,7 +475,6 @@ class MsgNotice
         curl_setopt($ch, CURLOPT_ENCODING, "gzip");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         $ret = curl_exec($ch);
-        curl_close($ch);
         return $ret;
     }
 }

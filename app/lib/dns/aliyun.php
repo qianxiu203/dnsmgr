@@ -60,7 +60,7 @@ class aliyun implements DnsInterface
     }
 
     //获取解析记录列表
-    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null)
+    public function getDomainRecords($PageNumber = 1, $PageSize = 20, $KeyWord = null, $SubDomain = null, $Value = null, $Type = null, $Line = null, $Status = null, $SortField = null, $SortOrder = 'asc')
     {
         $param = ['Action' => 'DescribeDomainRecords', 'DomainName' => $this->domain, 'PageNumber' => $PageNumber, 'PageSize' => $PageSize];
         if (!empty($SubDomain) || !empty($Type) || !empty($Line) || !empty($Value)) {
@@ -71,6 +71,17 @@ class aliyun implements DnsInterface
         if (!isNullOrEmpty($Status)) {
             $Status = $Status == '1' ? 'Enable' : 'Disable';
             $param += ['Status' => $Status];
+        }
+        $groupid = request()->post('groupid');
+        if (!empty($groupid)) {
+            $param += ['GroupId' => $groupid];
+        }
+        $allowedSort = ['Name' => 'RR', 'Type' => 'Type', 'LineName' => 'Line', 'Value' => 'Value', 'UpdateTime' => 'UpdateDate'];
+        if ($SortField && isset($allowedSort[$SortField])) {
+            $param += [
+                'OrderBy' => $allowedSort[$SortField],
+                'Direction' => strtolower($SortOrder) === 'desc' ? 'DESC' : 'ASC',
+            ];
         }
         $data = $this->request($param, true);
         if ($data) {
@@ -234,7 +245,7 @@ class aliyun implements DnsInterface
     public function getDomainInfo()
     {
         if (!empty($this->domainInfo)) return $this->domainInfo;
-        $param = ['Action' => 'DescribeDomainInfo', 'DomainName' => $this->domain, 'NeedDetailAttributes' => 'true'];
+        $param = ['Action' => 'DescribeDomainInfo', 'DomainName' => $this->domain, 'NeedDetailAttributes' => 'true', 'Lang' => 'zh'];
         $data = $this->request($param, true);
         if ($data) {
             $this->domainInfo = $data;
@@ -251,6 +262,24 @@ class aliyun implements DnsInterface
             return $data['MinTtl'];
         }
         return false;
+    }
+
+    //获取解析记录分组列表
+    public function getRecordGroups()
+    {
+        $param = ['Action' => 'DescribeRecordGroups', 'DomainName' => $this->domain, 'PageSize' => 100, 'Lang' => 'zh'];
+        $data = $this->request($param, true);
+        if ($data) {
+            return $data['RecordGroups']['RecordGroup'];
+        }
+        return false;
+    }
+
+    //修改解析记录分组
+    public function changeRecordGroup($RecordIdList, $GroupId)
+    {
+        $param = ['Action' => 'ChangeRecordGroup', 'DomainName' => $this->domain, 'RecordIdList' => json_encode($RecordIdList), 'GroupId' => $GroupId];
+        return $this->request($param);
     }
 
     //获取权重配置子域名列表

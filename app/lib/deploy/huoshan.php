@@ -33,7 +33,7 @@ class huoshan implements DeployInterface
         if ($config['product'] == 'live') {
             $this->deploy_live($fullchain, $privatekey, $config);
         } else {
-            $cert_id = $this->get_cert_id($fullchain, $privatekey);
+            $cert_id = $this->get_cert_id($fullchain, $privatekey, $config);
             if (!$cert_id) throw new Exception('获取证书ID失败');
             $info['cert_id'] = $cert_id;
             if (!isset($config['product']) || $config['product'] == 'cdn') {
@@ -48,6 +48,8 @@ class huoshan implements DeployInterface
                 $this->deploy_clb($cert_id, $config);
             } elseif ($config['product'] == 'alb') {
                 $this->deploy_alb($cert_id, $config);
+            } elseif ($config['product'] == 'vod') {
+                $this->deploy_vod($cert_id, $config);
             }
         }
     }
@@ -119,6 +121,9 @@ class huoshan implements DeployInterface
             ],
             'UseWay' => 'https',
         ];
+        if (!empty($config['project_name'])) {
+            $param['ProjectName'] = $config['project_name'];
+        }
         $result = $client->request('POST', 'CreateCert', $param);
         $this->log('上传证书成功 ChainID=' . $result['ChainID']);
 
@@ -132,6 +137,33 @@ class huoshan implements DeployInterface
             ];
             $client->request('POST', 'BindCert', $param);
             $this->log('视频直播域名 ' . $domain . ' 部署证书成功！');
+        }
+    }
+
+    private function deploy_vod($cert_id, $config)
+    {
+        if (empty($config['domain'])) throw new Exception('绑定的域名不能为空');
+        if (empty($config['vod_space_name'])) throw new Exception('点播空间名称不能为空');
+        if (empty($config['vod_domain_type'])) throw new Exception('点播域名类型不能为空');
+
+        $client = new Volcengine($this->AccessKeyId, $this->SecretAccessKey, 'vod.volcengineapi.com', 'vod', '2023-07-01', 'cn-north-1', $this->proxy);
+        foreach (explode(',', $config['domain']) as $domain) {
+            if (empty($domain)) continue;
+            $param = [
+                'SpaceName' => $config['vod_space_name'],
+                'DomainType' => $config['vod_domain_type'],
+                'Domain' => $domain,
+                'Config' => [
+                    'HTTPS' => [
+                        'Switch' => true,
+                        'CertInfo' => [
+                            'CertId' => $cert_id,
+                        ],
+                    ],
+                ],
+            ];
+            $client->request('POST', 'UpdateDomainConfig', $param);
+            $this->log('视频点播域名 ' . $domain . ' 部署证书成功！');
         }
     }
 
@@ -185,7 +217,7 @@ class huoshan implements DeployInterface
         $this->log('ALB监听器 ' . $config['listener_id'] . ' 部署证书成功！');
     }
 
-    private function get_cert_id($fullchain, $privatekey)
+    private function get_cert_id($fullchain, $privatekey, $config)
     {
         $certInfo = openssl_x509_parse($fullchain, true);
         if (!$certInfo) throw new Exception('证书解析失败');
@@ -200,6 +232,9 @@ class huoshan implements DeployInterface
                 'PrivateKey' => $privatekey,
             ],
         ];
+        if (!empty($config['project_name'])) {
+            $param['ProjectName'] = $config['project_name'];
+        }
         try {
             $data = $client->request('POST', 'ImportCertificate', $param);
         } catch (Exception $e) {
@@ -208,7 +243,7 @@ class huoshan implements DeployInterface
         if (!empty($data['InstanceId'])) {
             $cert_id = $data['InstanceId'];
             $this->log('上传证书成功 CertId=' . $cert_id);
-
+            sleep(1);
             $param = [
                 'InstanceId' => $cert_id,
                 'Options' => [
